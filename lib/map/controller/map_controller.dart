@@ -118,8 +118,11 @@ class MapController extends StateNotifier<MapState> {
   void setDragging(bool isDragging) {
     state = state.copyWith(isDragging: isDragging);
     if (isDragging) {
-      // Close info window immediately when dragging starts
-      state = state.copyWith(selectedIncident: null, selectedPosition: null);
+      // Don't close info window when dragging starts
+      // state = state.copyWith(
+      //   clearSelectedIncident: true,
+      //   clearSelectedPosition: true,
+      // );
       // Cancel any pending timer
       _allowMarkerSelectionTimer?.cancel();
       _allowMarkerSelectionTimer = null;
@@ -128,7 +131,7 @@ class MapController extends StateNotifier<MapState> {
       _lastDragEndTime = DateTime.now();
       // Set a timer to allow marker selection after a delay
       _allowMarkerSelectionTimer?.cancel();
-      _allowMarkerSelectionTimer = Timer(const Duration(milliseconds: 600), () {
+      _allowMarkerSelectionTimer = Timer(const Duration(milliseconds: 150), () {
         _lastDragEndTime = null; // Clear the drag end time after delay
       });
     }
@@ -144,7 +147,7 @@ class MapController extends StateNotifier<MapState> {
     // This prevents accidental opens when marker tap happens right after drag
     if (_lastDragEndTime != null) {
       final timeSinceDragEnd = DateTime.now().difference(_lastDragEndTime!);
-      if (timeSinceDragEnd.inMilliseconds < 600) {
+      if (timeSinceDragEnd.inMilliseconds < 150) {
         return;
       }
     }
@@ -156,12 +159,23 @@ class MapController extends StateNotifier<MapState> {
   }
 
   void clearSelectedMarker() {
-    state = state.copyWith(selectedIncident: null, selectedPosition: null);
+    state = state.copyWith(
+      clearSelectedIncident: true,
+      clearSelectedPosition: true,
+    );
     // Reset drag end time when explicitly closing
     _lastDragEndTime = null;
   }
 
   Future<void> addAlertMarker(String alertType, LatLng position) async {
+    // This method is now used for direct addition or finalization
+    await _createAndAddAlertMarker(alertType, position);
+  }
+
+  Future<void> _createAndAddAlertMarker(
+    String alertType,
+    LatLng position,
+  ) async {
     const markerIconSize = 142;
     BitmapDescriptor icon = BitmapDescriptor.defaultMarker;
 
@@ -217,6 +231,96 @@ class MapController extends StateNotifier<MapState> {
     );
 
     state = state.copyWith(markers: {...state.markers, marker});
+  }
+
+  Future<void> setPreviewAlertMarker(String alertType, LatLng position) async {
+    const markerIconSize = 142;
+
+    // Use the same icon logic as addAlertMarker
+    String? iconType;
+    if (alertType.toLowerCase().contains('accident') ||
+        alertType.toLowerCase().contains('crash')) {
+      iconType = 'accident';
+    } else if (alertType.toLowerCase().contains('fire')) {
+      iconType = 'fire';
+    } else if (alertType.toLowerCase().contains('gun')) {
+      iconType = 'gun';
+    } else if (alertType.toLowerCase().contains('knife')) {
+      iconType = 'knife';
+    } else if (alertType.toLowerCase().contains('fight')) {
+      iconType = 'fight';
+    } else if (alertType.toLowerCase().contains('protest')) {
+      iconType = 'protest';
+    } else if (alertType.toLowerCase().contains('medicine') ||
+        alertType.toLowerCase().contains('medical')) {
+      iconType = 'medical';
+    } else {
+      iconType = 'accident'; // default
+    }
+
+    final assetPath =
+        markerService.markerIcons[iconType] ??
+        markerService.markerIcons['accident']!;
+    final icon = await markerService.bitmapFromIncidentAsset(
+      assetPath,
+      markerIconSize,
+    );
+
+    final previewMarker = Marker(
+      markerId: const MarkerId('preview_alert'),
+      position: position,
+      icon: icon,
+      draggable: true,
+      onDragEnd: (newPos) {
+        updatePreviewAlertPosition(newPos);
+      },
+    );
+
+    state = state.copyWith(
+      markers: {...state.markers, previewMarker},
+      previewAlertMarkerId: 'preview_alert',
+      previewAlertType: alertType,
+      previewAlertPosition: position,
+    );
+  }
+
+  void updatePreviewAlertPosition(LatLng position) {
+    if (state.previewAlertMarkerId == null) return;
+
+    // Update the marker position in the list
+    final updatedMarkers = state.markers.map((m) {
+      if (m.markerId.value == 'preview_alert') {
+        return m.copyWith(positionParam: position);
+      }
+      return m;
+    }).toSet();
+
+    state = state.copyWith(
+      markers: updatedMarkers,
+      previewAlertPosition: position,
+    );
+  }
+
+  void cancelPreviewAlert() {
+    if (state.previewAlertMarkerId == null) return;
+
+    state = state.copyWith(
+      markers: state.markers
+        ..removeWhere((m) => m.markerId.value == 'preview_alert'),
+      clearPreviewAlert: true,
+    );
+  }
+
+  Future<void> finalizeAlertMarker() async {
+    if (state.previewAlertMarkerId != null &&
+        state.previewAlertType != null &&
+        state.previewAlertPosition != null) {
+      await _createAndAddAlertMarker(
+        state.previewAlertType!,
+        state.previewAlertPosition!,
+      );
+      cancelPreviewAlert();
+    }
   }
 
   void updateFilters({String? alertType, String? distance, String? category}) {
@@ -371,8 +475,8 @@ class MapController extends StateNotifier<MapState> {
 
   void clearSelectedPolygon() {
     state = state.copyWith(
-      selectedPolygonId: null,
-      selectedPolygonPosition: null,
+      clearSelectedPolygonId: true,
+      clearSelectedPolygonPosition: true,
     );
   }
 
@@ -426,8 +530,8 @@ class MapController extends StateNotifier<MapState> {
   void clearRoute() {
     state = state.copyWith(
       polylines: {},
-      destination: null,
-      routeInfo: null,
+      clearDestination: true,
+      clearRouteInfo: true,
       markers: state.markers
         ..removeWhere((m) => m.markerId.value == 'destination'),
     );
@@ -512,9 +616,9 @@ class MapController extends StateNotifier<MapState> {
 
   void clearMapSelectedLocation() {
     state = state.copyWith(
-      mapSelectedLocation: null,
-      mapSelectedAddress: null,
-      mapSelectedIsOrigin: null,
+      clearMapSelectedLocation: true,
+      clearMapSelectedAddress: true,
+      clearMapSelectedIsOrigin: true,
     );
   }
 
@@ -523,7 +627,7 @@ class MapController extends StateNotifier<MapState> {
       final url =
           'https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=${mapService.googleApiKey}';
       final response = await http.get(Uri.parse(url));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'OK' && data['results'].isNotEmpty) {
@@ -537,13 +641,13 @@ class MapController extends StateNotifier<MapState> {
   }
 
   void startNavigation() {
-    state = state.copyWith(isNavigating: true);
+    state = state.copyWith(isNavigating: true, showGetDirectionCard: false);
   }
 
   void stopNavigation() {
     state = state.copyWith(
       isNavigating: false,
-      currentNavigationPosition: null,
+      clearCurrentNavigationPosition: true,
     );
   }
 
@@ -620,6 +724,10 @@ class MapState {
   final String? mapSelectedAddress;
   final bool? mapSelectedIsOrigin;
 
+  final String? previewAlertMarkerId;
+  final String? previewAlertType;
+  final LatLng? previewAlertPosition;
+
   MapState({
     this.myLocation,
     this.initialCamera,
@@ -646,6 +754,9 @@ class MapState {
     this.mapSelectedLocation,
     this.mapSelectedAddress,
     this.mapSelectedIsOrigin,
+    this.previewAlertMarkerId,
+    this.previewAlertType,
+    this.previewAlertPosition,
   });
 
   MapState copyWith({
@@ -674,6 +785,20 @@ class MapState {
     LatLng? mapSelectedLocation,
     String? mapSelectedAddress,
     bool? mapSelectedIsOrigin,
+    String? previewAlertMarkerId,
+    String? previewAlertType,
+    LatLng? previewAlertPosition,
+    bool clearDestination = false,
+    bool clearRouteInfo = false,
+    bool clearSelectedIncident = false,
+    bool clearSelectedPosition = false,
+    bool clearSelectedPolygonId = false,
+    bool clearSelectedPolygonPosition = false,
+    bool clearCurrentNavigationPosition = false,
+    bool clearMapSelectedLocation = false,
+    bool clearMapSelectedAddress = false,
+    bool clearMapSelectedIsOrigin = false,
+    bool clearPreviewAlert = false,
   }) {
     return MapState(
       myLocation: myLocation ?? this.myLocation,
@@ -684,14 +809,21 @@ class MapState {
       circles: circles ?? this.circles,
       showAlertPanel: showAlertPanel ?? this.showAlertPanel,
       showGetDirectionCard: showGetDirectionCard ?? this.showGetDirectionCard,
-      destination: destination,
-      routeInfo: routeInfo,
-      selectedIncident: selectedIncident ?? this.selectedIncident,
-      selectedPosition: selectedPosition ?? this.selectedPosition,
+      destination: clearDestination ? null : (destination ?? this.destination),
+      routeInfo: clearRouteInfo ? null : (routeInfo ?? this.routeInfo),
+      selectedIncident: clearSelectedIncident
+          ? null
+          : (selectedIncident ?? this.selectedIncident),
+      selectedPosition: clearSelectedPosition
+          ? null
+          : (selectedPosition ?? this.selectedPosition),
       isDragging: isDragging ?? this.isDragging,
-      selectedPolygonId: selectedPolygonId ?? this.selectedPolygonId,
-      selectedPolygonPosition:
-          selectedPolygonPosition ?? this.selectedPolygonPosition,
+      selectedPolygonId: clearSelectedPolygonId
+          ? null
+          : (selectedPolygonId ?? this.selectedPolygonId),
+      selectedPolygonPosition: clearSelectedPolygonPosition
+          ? null
+          : (selectedPolygonPosition ?? this.selectedPolygonPosition),
       selectedAlertType: selectedAlertType ?? this.selectedAlertType,
       selectedDistance: selectedDistance ?? this.selectedDistance,
       selectedCategory: selectedCategory ?? this.selectedCategory,
@@ -699,11 +831,27 @@ class MapState {
           isDestinationSelectionMode ?? this.isDestinationSelectionMode,
       isSelectingOrigin: isSelectingOrigin ?? this.isSelectingOrigin,
       isNavigating: isNavigating ?? this.isNavigating,
-      currentNavigationPosition:
-          currentNavigationPosition ?? this.currentNavigationPosition,
-      mapSelectedLocation: mapSelectedLocation ?? this.mapSelectedLocation,
-      mapSelectedAddress: mapSelectedAddress ?? this.mapSelectedAddress,
-      mapSelectedIsOrigin: mapSelectedIsOrigin ?? this.mapSelectedIsOrigin,
+      currentNavigationPosition: clearCurrentNavigationPosition
+          ? null
+          : (currentNavigationPosition ?? this.currentNavigationPosition),
+      mapSelectedLocation: clearMapSelectedLocation
+          ? null
+          : (mapSelectedLocation ?? this.mapSelectedLocation),
+      mapSelectedAddress: clearMapSelectedAddress
+          ? null
+          : (mapSelectedAddress ?? this.mapSelectedAddress),
+      mapSelectedIsOrigin: clearMapSelectedIsOrigin
+          ? null
+          : (mapSelectedIsOrigin ?? this.mapSelectedIsOrigin),
+      previewAlertMarkerId: clearPreviewAlert
+          ? null
+          : (previewAlertMarkerId ?? this.previewAlertMarkerId),
+      previewAlertType: clearPreviewAlert
+          ? null
+          : (previewAlertType ?? this.previewAlertType),
+      previewAlertPosition: clearPreviewAlert
+          ? null
+          : (previewAlertPosition ?? this.previewAlertPosition),
     );
   }
 }

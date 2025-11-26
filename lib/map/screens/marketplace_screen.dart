@@ -218,6 +218,12 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
         _pendingAlertType = alertType;
       });
     }
+
+    // Close alert panel if open
+    final state = ref.read(mapControllerProvider);
+    if (state.showAlertPanel) {
+      ref.read(mapControllerProvider.notifier).toggleAlertPanel();
+    }
   }
 
   bool _isSelectingAlertLocation = false;
@@ -253,6 +259,15 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     final state = ref.watch(mapControllerProvider);
     final mapController = ref.read(mapControllerProvider.notifier);
 
+    // Listen for selection changes to update info window position
+    ref.listen(mapControllerProvider, (previous, next) {
+      if (previous?.selectedPosition != next.selectedPosition ||
+          previous?.selectedPolygonPosition != next.selectedPolygonPosition) {
+        // Update info window when selection changes
+        _updateInfoWindow();
+      }
+    });
+
     if (state.myLocation == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -274,24 +289,23 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
             //////
             onCameraMoveStarted: () {
               mapController.setDragging(true);
-              // Close info window immediately when dragging starts
-              setState(() => _infoOffset = null);
+              // Don't close info window when dragging starts
+              // setState(() => _infoOffset = null);
             },
             onCameraMove: (_) => _updateInfoWindow(),
             onCameraIdle: () {
-              // Wait longer to distinguish between drag and tap
-              // Increased delay to prevent marker tap immediately after drag
-              Future.delayed(const Duration(milliseconds: 600), () {
-                if (mounted) {
-                  mapController.setDragging(false);
-                  _updateInfoWindow();
-                }
-              });
+              if (mounted) {
+                mapController.setDragging(false);
+                _updateInfoWindow();
+              }
             },
             onTap: (pos) async {
               // Handle alert location selection
               if (_isSelectingAlertLocation && _pendingAlertType != null) {
-                await mapController.addAlertMarker(_pendingAlertType!, pos);
+                await mapController.setPreviewAlertMarker(
+                  _pendingAlertType!,
+                  pos,
+                );
                 setState(() {
                   _isSelectingAlertLocation = false;
                   _pendingAlertType = null;
@@ -360,10 +374,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
             Positioned(
               left:
                   _infoOffset!.dx -
-                  (state.selectedIncident!.markerType == 'content' ? 140 : 110),
+                  (state.selectedIncident!.markerType == 'content' ? 90 : 140),
               top:
                   _infoOffset!.dy -
-                  (state.selectedIncident!.markerType == 'content' ? 340 : 140),
+                  (state.selectedIncident!.markerType == 'content' ? 230 : 195),
               child: state.selectedIncident!.markerType == 'content'
                   ? ContentMarkerPopup(
                       incident: state.selectedIncident!,
@@ -628,6 +642,116 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                     ),
                   ],
                 ),
+              ),
+            ),
+
+          // Selection Mode Status Banner
+          if (_isSelectingAlertLocation || state.isDestinationSelectionMode)
+            Positioned(
+              top: 100,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.touch_app, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _isSelectingAlertLocation
+                            ? 'Tap on map to place ${_pendingAlertType ?? "alert"}'
+                            : 'Tap on map to select location',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white70),
+                      onPressed: () {
+                        if (_isSelectingAlertLocation) {
+                          setState(() {
+                            _isSelectingAlertLocation = false;
+                            _pendingAlertType = null;
+                          });
+                        } else {
+                          mapController.setDestinationSelectionMode(false);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Preview Alert Confirmation UI
+          if (state.previewAlertMarkerId != null)
+            Positioned(
+              bottom: 30,
+              left: 20,
+              right: 20,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Long press and drag marker to adjust position',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          mapController.cancelPreviewAlert();
+                        },
+                        icon: const Icon(Icons.close),
+                        label: const Text('Cancel'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          mapController.finalizeAlertMarker();
+                        },
+                        icon: const Icon(Icons.check),
+                        label: const Text('Send Alert'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
         ],

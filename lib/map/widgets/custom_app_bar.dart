@@ -57,7 +57,7 @@ class CustomMapAppBar extends StatelessWidget implements PreferredSizeWidget {
               children: const [
                 Text(
                   'Scan',
-                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.w400, fontSize: 16),
                 ),
                 Text(
                   'Photo',
