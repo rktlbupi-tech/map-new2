@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:map/map/controller/map_controller.dart';
+import 'package:map/map/models/map_state.dart';
 import 'package:map/map/widgets/custom_info_window.dart';
 import 'package:map/map/widgets/danger_zone_info_window.dart';
 import 'package:map/map/widgets/serarch_filter_widget.dart';
@@ -228,6 +229,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
 
   bool _isSelectingAlertLocation = false;
   String? _pendingAlertType;
+  Offset? _routeInfoOffset;
 
   Future<void> _updateInfoWindow() async {
     final state = ref.read(mapControllerProvider);
@@ -251,6 +253,21 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       setState(() {
         _polygonInfoOffset = Offset(screen.x.toDouble(), screen.y.toDouble());
       });
+    }
+
+    if (state.routeMidpoint != null) {
+      final controller = await _controller.future;
+      final screen = await controller.getScreenCoordinate(state.routeMidpoint!);
+
+      setState(() {
+        _routeInfoOffset = Offset(screen.x.toDouble(), screen.y.toDouble());
+      });
+    } else {
+      if (_routeInfoOffset != null) {
+        setState(() {
+          _routeInfoOffset = null;
+        });
+      }
     }
   }
 
@@ -398,19 +415,92 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                     ),
             ),
           if (_polygonInfoOffset != null && state.selectedPolygonId != null)
-            if (_polygonInfoOffset != null && state.selectedPolygonId != null)
-              Positioned(
-                left: _polygonInfoOffset!.dx - 110,
-                top: _polygonInfoOffset!.dy - 140,
-                child: DangerZoneInfoWindow(
-                  name: "Danger Zone",
-                  description: "High risk area - proceed with caution",
-                  onPressed: () {
-                    mapController.clearSelectedPolygon();
-                    setState(() => _polygonInfoOffset = null);
-                  },
-                ),
+            Positioned(
+              left: _polygonInfoOffset!.dx - 110,
+              top: _polygonInfoOffset!.dy - 140,
+              child: DangerZoneInfoWindow(
+                name: "Danger Zone",
+                description: "High risk area - proceed with caution",
+                onPressed: () {
+                  mapController.clearSelectedPolygon();
+                  setState(() => _polygonInfoOffset = null);
+                },
               ),
+            ),
+
+          if (_routeInfoOffset != null && state.routeInfo != null)
+            Positioned(
+              left: _routeInfoOffset!.dx - 75, // Center width 150/2
+              top:
+                  _routeInfoOffset!.dy -
+                  60 -
+                  12, // Above line (container + triangle)
+              child: Column(
+                children: [
+                  Container(
+                    width: 150,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          state.routeInfo!.formattedDistance,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 1,
+                          height: 12,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          state.routeInfo!.formattedDuration,
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () {
+                            ref
+                                .read(mapControllerProvider.notifier)
+                                .clearRoute();
+                          },
+                          child: const Icon(
+                            Icons.close,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  CustomPaint(
+                    size: const Size(20, 12),
+                    painter: _TrianglePainter(),
+                  ),
+                ],
+              ),
+            ),
 
           // Search + Filter Bar
           Positioned(
@@ -553,98 +643,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
             ),
           ),
 
-          // Route Info Card
-          if (state.routeInfo != null)
-            Positioned(
-              bottom: 20,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.route,
-                                size: 20,
-                                color: Colors.blue,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Route',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black.withOpacity(0.8),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.straighten,
-                                size: 16,
-                                color: Colors.grey[600],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                state.routeInfo!.formattedDistance,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Icon(
-                                Icons.access_time,
-                                size: 16,
-                                color: Colors.grey[600],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                state.routeInfo!.formattedDuration,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () {
-                        ref.read(mapControllerProvider.notifier).clearRoute();
-                      },
-                      color: Colors.grey[600],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
           // Selection Mode Status Banner
           if (_isSelectingAlertLocation || state.isDestinationSelectionMode)
             Positioned(
@@ -758,4 +756,20 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       ),
     );
   }
+}
+
+class _TrianglePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white;
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
