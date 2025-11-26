@@ -123,6 +123,7 @@ class MapController extends StateNotifier<MapState> {
       //   clearSelectedIncident: true,
       //   clearSelectedPosition: true,
       // );
+      // sdf
       // Cancel any pending timer
       _allowMarkerSelectionTimer?.cancel();
       _allowMarkerSelectionTimer = null;
