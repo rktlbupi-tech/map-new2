@@ -60,6 +60,17 @@ class Incident {
   }
 
   factory Incident.fromJson(Map<String, dynamic> json) {
+    double lat = 0.0;
+    double lng = 0.0;
+
+    if (json['position'] != null) {
+      lat = (json['position']['lat'] ?? 0.0).toDouble();
+      lng = (json['position']['lng'] ?? 0.0).toDouble();
+    } else {
+      lat = (json['lat'] ?? json['latitude'] ?? 0.0).toDouble();
+      lng = (json['lng'] ?? json['longitude'] ?? 0.0).toDouble();
+    }
+
     return Incident(
       id:
           json['_id'] ??
@@ -67,10 +78,7 @@ class Incident {
           DateTime.now().millisecondsSinceEpoch.toString(),
       markerType: json['markerType'] ?? 'icon',
       type: json['type'] ?? 'accident',
-      position: LatLng(
-        (json['lat'] ?? json['latitude'] ?? 0.0).toDouble(),
-        (json['lng'] ?? json['longitude'] ?? 0.0).toDouble(),
-      ),
+      position: LatLng(lat, lng),
       address: json['address'],
       time: json['createdAt'] ?? json['time'],
       image: json['image'],

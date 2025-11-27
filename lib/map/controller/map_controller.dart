@@ -351,7 +351,7 @@ class MapController extends StateNotifier<MapState> {
       selectedCategory: category,
     );
     // Refresh markers with new filters
-    addNearbyMarkers();
+    // addNearbyMarkers();
   }
 
   double _parseDistance(String distanceStr) {
@@ -373,77 +373,6 @@ class MapController extends StateNotifier<MapState> {
             math.sin(dLng / 2);
     final c = 2 * math.atan2(math.sqrt(a1), math.sqrt(1 - a1));
     return earthRadius * c;
-  }
-
-  Future<void> addNearbyMarkers() async {
-    if (state.myLocation == null) return;
-
-    const markerIconSize = 142;
-    var incidents = markerService.getIncidents();
-
-    // Apply filters
-    if (state.selectedAlertType != null && state.selectedAlertType != 'Alert') {
-      incidents = incidents.where((incident) {
-        return incident.alertType == state.selectedAlertType;
-      }).toList();
-    }
-
-    if (state.selectedCategory != null &&
-        state.selectedCategory != 'Category') {
-      incidents = incidents.where((incident) {
-        return incident.category == state.selectedCategory;
-      }).toList();
-    }
-
-    if (state.selectedDistance != null && state.selectedDistance != '2 miles') {
-      final maxDistance = _parseDistance(state.selectedDistance!);
-      incidents = incidents.where((incident) {
-        final distance = _calculateDistance(
-          state.myLocation!,
-          incident.position,
-        );
-        return distance <= maxDistance;
-      }).toList();
-    }
-
-    final List<Marker> markers = [];
-
-    for (var incident in incidents) {
-      BitmapDescriptor icon = BitmapDescriptor.defaultMarker;
-
-      if (incident.markerType == 'icon') {
-        final assetPath =
-            markerService.markerIcons[incident.type] ??
-            markerService.markerIcons['accident']!;
-        icon = await markerService.bitmapFromIncidentAsset(
-          assetPath,
-          markerIconSize,
-        );
-      } else if (incident.markerType == 'content' ||
-          incident.markerType == 'hopper') {
-        icon = await bitmapFromNetwork(incident.image!, size: 120);
-      }
-
-      markers.add(
-        Marker(
-          markerId: MarkerId(incident.id),
-          position: incident.position,
-          icon: icon,
-          onTap: () {
-            selectMarker(incident);
-          },
-          infoWindow: const InfoWindow(),
-        ),
-      );
-    }
-
-    // Remove old incident markers, keep user location and demo markers
-    final filteredMarkers = state.markers.where((m) {
-      return m.markerId.value == 'me' ||
-          m.markerId.value == 'demo_route_marker';
-    }).toSet();
-
-    state = state.copyWith(markers: {...filteredMarkers, ...markers});
   }
 
   void addDemoPolygon() {
@@ -733,7 +662,16 @@ class MapController extends StateNotifier<MapState> {
 
   Future<void> fetchInitialIncidents() async {
     try {
-      final res = await http.get(Uri.parse("${BASE_URL}/getAlertIncidents"));
+      final token =
+          "4fcf3f78138f61fe6273dbd1d6c05f15e30496d7a085919bbcdcf11f271dcecfb564cd09ae8877ede8f0b29ede2a1cbf245934cae15dd33fedab79bd6194d235ca44175e35545f9491707b2c7a40576894f842d7ed900d2fb4a054585a9c7b346207f9ba38a154f8433b0215da5e8eb794b390e1479f4b25bb2c7ecbdf9ba6b28cdfcca0811f355700c38e2d428f0b2535fc13fdc1d2711340eb2e6802f2ad3c2525ddec008cf54eb9368afc68e086d3f882fedc68da8f1e503be333e35fb673766ad88ccbf2804b2e12532db5f3dc2d";
+
+      final res = await http.get(
+        Uri.parse("${BASE_URL}hopper/getAlertIncidents"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
 
       print(":::fetchInitialIncidents ${res.body}");
 

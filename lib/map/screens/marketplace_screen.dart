@@ -65,11 +65,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     if (myLocation != null) {
       await mapController.setMyLocation(myLocation);
     }
-    await mapController.addNearbyMarkers();
-    mapController.addDemoPolygon();
-    final start = LatLng(37.785834, -122.406417);
-    final end = LatLng(37.7843755, -122.429);
-    await mapController.addDemoRoute(start, end);
+    // await mapController.addNearbyMarkers();
+    // mapController.addDemoPolygon();
+    // final start = LatLng(37.785834, -122.406417);
+    // final end = LatLng(37.7843755, -122.429);
+    // await mapController.addDemoRoute(start, end);
   }
 
   Future<void> _goToCurrentLocation() async {

@@ -243,8 +243,8 @@ class MarkerService {
     },
   ];
 
-  List<Incident> getIncidents() =>
-      defaultIncidents.map((e) => Incident.fromMap(e)).toList();
+  List<Incident> getIncidents() => [];
+  // defaultIncidents.map((e) => Incident.fromMap(e)).toList();
   Future<BitmapDescriptor> bitmapResize(
     String assetPath, {
     int width = 160,
