@@ -18,6 +18,11 @@ import '../widgets/get_direction_card.dart';
 import 'package:http/http.dart' as http;
 import '../widgets/content_marker_popup.dart';
 import 'news_details_screen.dart';
+import '../widgets/burst_animation.dart';
+
+import 'dart:math';
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
 
 final mapControllerProvider = StateNotifierProvider<MapController, MapState>(
   (ref) => MapController(
@@ -35,7 +40,8 @@ class MarketplaceScreen extends ConsumerStatefulWidget {
   ConsumerState<MarketplaceScreen> createState() => _MarketplaceScreenState();
 }
 
-class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
+class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen>
+    with SingleTickerProviderStateMixin {
   final Completer<GoogleMapController> _controller = Completer();
   double _currentZoom = 14.0;
   final TextEditingController _searchController = TextEditingController();
@@ -45,9 +51,20 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   Offset? _infoOffset;
   Offset? _polygonInfoOffset;
 
+  // Burst Animation
+  late AnimationController _burstController;
+  List<BurstParticle> _particles = [];
+
+  ui.Image? _burstImage;
+
   @override
   void initState() {
     super.initState();
+    _burstController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    )..addListener(_updateParticles);
+
     _initMap();
 
     _searchFocusNode.addListener(() {
@@ -176,9 +193,78 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
 
   @override
   void dispose() {
+    _burstController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _updateParticles() {
+    final t = _burstController.value;
+    final size = MediaQuery.of(context).size;
+
+    for (var p in _particles) {
+      p.scale = 0.6 + t * 0.5;
+      p.opacity = (1 - t).clamp(0.0, 1.0);
+
+      // Move upward with individual speed
+      p.position = p.position.translate(
+        (p.position.dx - size.width / 2) * 0.02 * t, // Spread outwards
+        -size.height * 0.01 * p.speed, // Move up based on speed
+      );
+    }
+
+    if (t == 1) _particles.clear();
+    setState(() {});
+  }
+
+  Future<ui.Image?> _loadImage(String assetPath) async {
+    try {
+      final data = await rootBundle.load(assetPath);
+      final list = Uint8List.view(data.buffer);
+      final completer = Completer<ui.Image>();
+      ui.decodeImageFromList(list, (img) {
+        completer.complete(img);
+      });
+      return completer.future;
+    } catch (e) {
+      debugPrint("Error loading burst image: $e");
+      return null;
+    }
+  }
+
+  Future<void> _addBurst(LatLng position, String type) async {
+    final size = MediaQuery.of(context).size;
+    // _burstType = type;
+    _particles.clear();
+
+    // Load image
+    final mapController = ref.read(mapControllerProvider.notifier);
+    final assetPath =
+        mapController.markerService.markerIcons[type] ??
+        mapController.markerService.markerIcons['accident']!;
+
+    _burstImage = await _loadImage(assetPath);
+
+    // Start from bottom, distributed horizontally and vertically (scattered)
+    for (int i = 0; i < 40; i++) {
+      double randomX = Random().nextDouble() * size.width;
+      double randomY =
+          size.height +
+          Random().nextDouble() * 300; // Staggered start below screen
+
+      _particles.add(
+        BurstParticle(
+          position: Offset(randomX, randomY),
+          scale: 0.5 + Random().nextDouble() * 0.5,
+          opacity: 1.0,
+          speed: 1.0 + Random().nextDouble() * 1.5, // Random speed 1.0 - 2.5
+          // rotation: Random().nextDouble() * 2 * pi, // Removed rotation
+        ),
+      );
+    }
+
+    _burstController.forward(from: 0);
   }
 
   Future<void> _showLocationSelectionDialog(
@@ -738,6 +824,13 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                       ),
                       ElevatedButton.icon(
                         onPressed: () {
+                          if (state.previewAlertPosition != null &&
+                              state.previewAlertType != null) {
+                            _addBurst(
+                              state.previewAlertPosition!,
+                              state.previewAlertType!,
+                            );
+                          }
                           mapController.finalizeAlertMarker();
                         },
                         icon: const Icon(Icons.check),
@@ -752,6 +845,13 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                 ],
               ),
             ),
+          // Burst Animation Layer
+          IgnorePointer(
+            child: CustomPaint(
+              painter: BurstPainter(_particles, _burstImage),
+              size: MediaQuery.of(context).size,
+            ),
+          ),
         ],
       ),
     );
