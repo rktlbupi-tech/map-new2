@@ -9,12 +9,16 @@ import 'package:map/map/models/map_state.dart';
 import 'package:map/map/models/marker_model.dart';
 import '../services/marker_service.dart';
 import '../services/map_service.dart';
+import 'package:map/map/services/socket_service.dart'; // Added import
 import 'package:http/http.dart' as http;
 import 'dart:ui' as ui;
+
+const String BASE_URL = 'https://dev-api.presshop.news:5019/';
 
 class MapController extends StateNotifier<MapState> {
   final MapService mapService;
   final MarkerService markerService;
+  final SocketService socketService; // Added socketService
   Timer? _demoRouteTimer;
   int _demoRouteIndex = 0;
   String _demoRouteInfo = '';
@@ -22,7 +26,18 @@ class MapController extends StateNotifier<MapState> {
   Timer? _allowMarkerSelectionTimer;
 
   MapController({required this.mapService, required this.markerService})
-    : super(MapState());
+    : socketService = SocketService(), // Initialize SocketService
+      super(MapState()) {
+    socketService.initSocket(); // Call initSocket
+
+    // Listen for new incidents
+    socketService.socket.on('incident:create', (_) {
+      debugPrint("Received incident:create event, fetching incidents...");
+      fetchInitialIncidents();
+    });
+
+    fetchInitialIncidents(); // Fetch initial incidents
+  }
 
   Future<void> setMyLocation(LatLng location) async {
     final updatedCircles = {
@@ -313,10 +328,18 @@ class MapController extends StateNotifier<MapState> {
     if (state.previewAlertMarkerId != null &&
         state.previewAlertType != null &&
         state.previewAlertPosition != null) {
+      // Add marker to map
       await _createAndAddAlertMarker(
         state.previewAlertType!,
         state.previewAlertPosition!,
       );
+
+      // Emit alert via socket
+      socketService.emitAlert(
+        alertType: state.previewAlertType!,
+        position: state.previewAlertPosition!,
+      );
+
       cancelPreviewAlert();
     }
   }
@@ -704,6 +727,74 @@ class MapController extends StateNotifier<MapState> {
   void dispose() {
     _demoRouteTimer?.cancel();
     _allowMarkerSelectionTimer?.cancel();
+    socketService.dispose();
     super.dispose();
+  }
+
+  Future<void> fetchInitialIncidents() async {
+    try {
+      final res = await http.get(Uri.parse("${BASE_URL}/getAlertIncidents"));
+
+      print(":::fetchInitialIncidents ${res.body}");
+
+      if (res.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(res.body);
+        final List<Incident> incidents = data
+            .map((j) => Incident.fromJson(j))
+            .toList();
+
+        final Set<Marker> newMarkers = {};
+        const markerIconSize = 142;
+
+        for (final incident in incidents) {
+          String? iconType;
+          final type = incident.type ?? incident.alertType ?? 'accident';
+
+          if (type.toLowerCase().contains('accident') ||
+              type.toLowerCase().contains('crash')) {
+            iconType = 'accident';
+          } else if (type.toLowerCase().contains('fire')) {
+            iconType = 'fire';
+          } else if (type.toLowerCase().contains('gun')) {
+            iconType = 'gun';
+          } else if (type.toLowerCase().contains('knife')) {
+            iconType = 'knife';
+          } else if (type.toLowerCase().contains('fight')) {
+            iconType = 'fight';
+          } else if (type.toLowerCase().contains('protest')) {
+            iconType = 'protest';
+          } else if (type.toLowerCase().contains('medicine') ||
+              type.toLowerCase().contains('medical')) {
+            iconType = 'medical';
+          } else {
+            iconType = 'accident'; // default
+          }
+
+          final assetPath =
+              markerService.markerIcons[iconType] ??
+              markerService.markerIcons['accident']!;
+
+          final icon = await markerService.bitmapFromIncidentAsset(
+            assetPath,
+            markerIconSize,
+          );
+
+          newMarkers.add(
+            Marker(
+              markerId: MarkerId(incident.id),
+              position: incident.position,
+              icon: icon,
+              onTap: () {
+                selectMarker(incident);
+              },
+            ),
+          );
+        }
+
+        state = state.copyWith(markers: {...state.markers, ...newMarkers});
+      }
+    } catch (e) {
+      debugPrint("Error fetching incidents: $e");
+    }
   }
 }

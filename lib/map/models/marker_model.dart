@@ -58,6 +58,33 @@ class Incident {
       alertType: map['alertType'],
     );
   }
+
+  factory Incident.fromJson(Map<String, dynamic> json) {
+    return Incident(
+      id:
+          json['_id'] ??
+          json['id'] ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      markerType: json['markerType'] ?? 'icon',
+      type: json['type'] ?? 'accident',
+      position: LatLng(
+        (json['lat'] ?? json['latitude'] ?? 0.0).toDouble(),
+        (json['lng'] ?? json['longitude'] ?? 0.0).toDouble(),
+      ),
+      address: json['address'],
+      time: json['createdAt'] ?? json['time'],
+      image: json['image'],
+      title: json['title'],
+      description: json['description'] ?? json['message'],
+      name: json['name'],
+      rating: json['rating'],
+      specialization: json['specialization'],
+      distance: json['distance'],
+      statusColor: json['statusColor'],
+      category: json['category'],
+      alertType: json['alertType'],
+    );
+  }
 }
 
 class DangerZone {
