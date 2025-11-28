@@ -9,14 +9,24 @@ class SocketService {
   // TODO: Replace with actual socket URL
   final String _socketUrl = 'https://dev-api.presshop.news:3005';
 
-  final String _userId = '67ed646cd9889612efdd464c';
-  void initSocket() {
+  // Callbacks for events
+  Function(dynamic)? onIncidentNew;
+  Function(dynamic)? onIncidentUpdated;
+  Function(dynamic)? onIncidentCreated;
+
+  void initSocket({
+    required String userId,
+    required String joinAs, // "website" | "admin" | "hopper" | "user"
+  }) {
     debugPrint(":::: Inside Socket Func :::::");
     debugPrint("socketUrl:::::$_socketUrl");
 
     socket = IO.io(
       _socketUrl,
-      IO.OptionBuilder().setTransports(['websocket']).build(),
+      IO.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .build(),
     );
 
     debugPrint("Socket Disconnect : ${socket.disconnected}");
@@ -24,23 +34,43 @@ class SocketService {
     socket.connect();
 
     socket.onConnect((_) {
-      debugPrint('Connected to socket');
-      // Join room or initial setup if needed
-      // socket.emit('room join', {"room_id": "YOUR_ROOM_ID"});
+      debugPrint('Connected to socket: ${socket.id}');
+      
+      if (joinAs == "website") socket.emit("joinWebsite");
+      if (joinAs == "admin") socket.emit("joinAdmin", userId);
+      if (joinAs == "hopper") socket.emit("joinHopper", userId);
+      if (joinAs == "user") socket.emit("joinUser", userId);
     });
 
     socket.onDisconnect((_) => debugPrint('Disconnected from socket'));
     socket.onError((data) => debugPrint("Error Socket ::: $data"));
+
+    // Listen for incident events
+    socket.on("incident:new", (data) {
+      debugPrint("Socket: incident:new received");
+      onIncidentNew?.call(data);
+    });
+
+    socket.on("incident:updated", (data) {
+      debugPrint("Socket: incident:updated received");
+      onIncidentUpdated?.call(data);
+    });
+
+    socket.on("incident:created", (data) {
+      debugPrint("Socket: incident:created received");
+      onIncidentCreated?.call(data);
+    });
   }
 
   void emitAlert({
     required String alertType,
     required LatLng position,
     String message = "",
+    required String userId,
   }) {
     debugPrint(":::: Inside Socket Emit Alert :::::");
     final Map<String, dynamic> data = {
-      "userId": _userId,
+      "userId": userId,
       "message": message,
       "type": alertType,
       "lat": position.latitude,

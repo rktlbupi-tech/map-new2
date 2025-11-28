@@ -26,6 +26,8 @@ import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 
+import 'package:flutter/services.dart';
+
 final mapControllerProvider = StateNotifierProvider<MapController, MapState>(
   (ref) => MapController(
     mapService: MapService(
@@ -268,6 +270,70 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen>
     _burstController.forward(from: 0);
   }
 
+  Future<void> _showLocationSelectionDialog(
+    BuildContext context,
+    String alertType,
+  ) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            color: Colors.white,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Select Location',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _ModernOptionTile(
+                icon: Icons.my_location,
+                text: 'Use Current Location',
+                onTap: () => Navigator.pop(context, 'current'),
+              ),
+              const SizedBox(height: 8),
+              _ModernOptionTile(
+                icon: Icons.map,
+                text: 'Select on Map',
+                onTap: () => Navigator.pop(context, 'map'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == 'current') {
+      final mapController = ref.read(mapControllerProvider.notifier);
+      final state = ref.read(mapControllerProvider);
+      if (state.myLocation != null) {
+        await mapController.addAlertMarker(alertType, state.myLocation!);
+      }
+    } else if (result == 'map') {
+      setState(() {
+        _isSelectingAlertLocation = true;
+        _pendingAlertType = alertType;
+      });
+    }
+
+    // Close alert panel if open
+    final state = ref.read(mapControllerProvider);
+    if (state.showAlertPanel) {
+      ref.read(mapControllerProvider.notifier).toggleAlertPanel();
+    }
+  }
+
   bool _isSelectingAlertLocation = false;
   String? _pendingAlertType;
   Offset? _routeInfoOffset;
@@ -465,6 +531,12 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen>
             // await mapController.addRoute(null, pos);
             // },
             padding: const EdgeInsets.only(bottom: 220),
+          ),
+          IgnorePointer(
+            child: CustomPaint(
+              painter: BurstPainter(_particles, _burstImage),
+              size: MediaQuery.of(context).size,
+            ),
           ),
           if (_infoOffset != null && state.selectedIncident != null)
             Positioned(
@@ -700,39 +772,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen>
                 child: AlertPanel(
                   onClose: mapController.toggleAlertPanel,
                   onAlertSelected: (alertType) async {
-                    // Direct alert placement flow
-                    if (state.myLocation != null) {
-                      // 1. Add marker to map
-                      await mapController.addAlertMarker(
-                        alertType,
-                        state.myLocation!,
-                      );
-
-                      // 2. Trigger burst animation
-                      _addBurst(state.myLocation!, alertType);
-
-                      // 3. Emit socket event (if not already handled by addAlertMarker,
-                      // but addAlertMarker in controller now calls _createAndAddAlertMarker
-                      // which adds to state. We need to ensure it emits too or we call emit separately.
-                      // Looking at controller, addAlertMarker just calls _createAndAddAlertMarker.
-                      // _createAndAddAlertMarker adds to state but DOES NOT emit.
-                      // finalizeAlertMarker DOES emit.
-                      // So we should probably call emit here or update controller.
-                      // Let's call emit directly via socketService for now to be safe and quick,
-                      // or better, let's update addAlertMarker in controller to also emit?
-                      // The user said "take rferent to this code handle socket service" previously.
-                      // In the previous turn I updated MapController but I didn't change addAlertMarker to emit.
-                      // I only updated finalizeAlertMarker to emit.
-                      // So I should probably manually emit here or create a new method in controller.
-                      // Actually, let's just use the socketService from controller.
-
-                      mapController.socketService.emitAlert(
-                        alertType: alertType,
-                        position: state.myLocation!,
-                        userId:
-                            "67ed646cd9889612efdd464c", // Using the hardcoded ID from controller
-                      );
-                    }
+                    await _showLocationSelectionDialog(context, alertType);
                   },
                 ),
               ),
@@ -809,13 +849,68 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen>
               ),
             ),
 
-          // Burst Animation Layer
-          IgnorePointer(
-            child: CustomPaint(
-              painter: BurstPainter(_particles, _burstImage),
-              size: MediaQuery.of(context).size,
+          // Preview Alert Confirmation UI
+          if (state.previewAlertMarkerId != null)
+            Positioned(
+              bottom: 30,
+              left: 20,
+              right: 20,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Long press and drag marker to adjust position',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          mapController.cancelPreviewAlert();
+                        },
+                        icon: const Icon(Icons.close),
+                        label: const Text('Cancel'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          if (state.previewAlertPosition != null &&
+                              state.previewAlertType != null) {
+                            _addBurst(
+                              state.previewAlertPosition!,
+                              state.previewAlertType!,
+                            );
+                          }
+                          mapController.finalizeAlertMarker();
+                        },
+                        icon: const Icon(Icons.check),
+                        label: const Text('Send Alert'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
+          // Burst Animation Layer
         ],
       ),
     );
@@ -836,4 +931,45 @@ class _TrianglePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _ModernOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final VoidCallback onTap;
+
+  const _ModernOptionTile({
+    required this.icon,
+    required this.text,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.pink.withOpacity(0.07),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.pink.shade400, size: 22),
+            const SizedBox(width: 12),
+            Text(
+              text,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.black87,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

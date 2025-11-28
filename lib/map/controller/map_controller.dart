@@ -25,18 +25,101 @@ class MapController extends StateNotifier<MapState> {
   DateTime? _lastDragEndTime;
   Timer? _allowMarkerSelectionTimer;
 
+  // Hardcoded for now, should come from auth service
+  final String _userId = '67ed646cd9889612efdd464c';
+
   MapController({required this.mapService, required this.markerService})
     : socketService = SocketService(), // Initialize SocketService
       super(MapState()) {
-    socketService.initSocket(); // Call initSocket
+    // Initialize socket with callbacks
+    socketService.onIncidentNew = (data) {
+      _handleNewIncident(data);
+    };
 
-    // Listen for new incidents
-    socketService.socket.on('incident:create', (_) {
-      debugPrint("Received incident:create event, fetching incidents...");
-      fetchInitialIncidents();
-    });
+    socketService.onIncidentUpdated = (data) {
+      _handleUpdatedIncident(data);
+    };
+
+    socketService.onIncidentCreated = (data) {
+      _handleNewIncident(data);
+    };
+
+    socketService.initSocket(
+      userId: _userId,
+      joinAs: "hopper", // Defaulting to hopper as per previous context
+    );
 
     fetchInitialIncidents(); // Fetch initial incidents
+  }
+
+  void _handleNewIncident(dynamic data) {
+    try {
+      final incident = Incident.fromJson(data);
+      // Avoid duplicates
+      if (state.markers.any((m) => m.markerId.value == incident.id)) {
+        return;
+      }
+      _addIncidentToMap(incident);
+    } catch (e) {
+      debugPrint("Error handling new incident: $e");
+    }
+  }
+
+  void _handleUpdatedIncident(dynamic data) {
+    try {
+      final updatedIncident = Incident.fromJson(data);
+
+      // To properly update, we should probably just re-add it
+      _addIncidentToMap(updatedIncident);
+    } catch (e) {
+      debugPrint("Error handling updated incident: $e");
+    }
+  }
+
+  Future<void> _addIncidentToMap(Incident incident) async {
+    const markerIconSize = 142;
+    String? iconType;
+    final type = incident.type ?? incident.alertType ?? 'accident';
+
+    if (type.toLowerCase().contains('accident') ||
+        type.toLowerCase().contains('crash')) {
+      iconType = 'accident';
+    } else if (type.toLowerCase().contains('fire')) {
+      iconType = 'fire';
+    } else if (type.toLowerCase().contains('gun')) {
+      iconType = 'gun';
+    } else if (type.toLowerCase().contains('knife')) {
+      iconType = 'knife';
+    } else if (type.toLowerCase().contains('fight')) {
+      iconType = 'fight';
+    } else if (type.toLowerCase().contains('protest')) {
+      iconType = 'protest';
+    } else if (type.toLowerCase().contains('medicine') ||
+        type.toLowerCase().contains('medical')) {
+      iconType = 'medical';
+    } else {
+      iconType = 'accident'; // default
+    }
+
+    final assetPath =
+        markerService.markerIcons[iconType] ??
+        markerService.markerIcons['accident']!;
+
+    final icon = await markerService.bitmapFromIncidentAsset(
+      assetPath,
+      markerIconSize,
+    );
+
+    final marker = Marker(
+      markerId: MarkerId(incident.id),
+      position: incident.position,
+      icon: icon,
+      onTap: () {
+        selectMarker(incident);
+      },
+    );
+
+    state = state.copyWith(markers: {...state.markers, marker});
   }
 
   Future<void> setMyLocation(LatLng location) async {
@@ -338,6 +421,7 @@ class MapController extends StateNotifier<MapState> {
       socketService.emitAlert(
         alertType: state.previewAlertType!,
         position: state.previewAlertPosition!,
+        userId: _userId,
       );
 
       cancelPreviewAlert();
