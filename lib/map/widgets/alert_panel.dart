@@ -8,16 +8,6 @@ class AlertPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // final alertItems = [
-    // {'icon': 'assets/markers/fire.gif', 'label': 'Accident'},
-    // {'icon': 'assets/markers/car-crash.gif', 'label': 'Crash'},
-    // {'icon': 'assets/markers/fight.gif', 'label': 'Fight'},
-    // {'icon': 'assets/markers/fire.gif', 'label': 'Fire Alert'},
-    // {'icon': 'assets/markers/knife.gif', 'label': 'Knife'},
-    // {'icon': 'assets/markers/medicine.gif', 'label': 'Medicine'},
-    // {'icon': 'assets/markers/protesters.gif', 'label': 'Protest'},
-    // {'icon': 'assets/markers/gun.gif', 'label': 'Gun Fire'},
-
     final List<Map<String, String>> alertTypes = [
       {
         'type': 'accident',
@@ -31,7 +21,7 @@ class AlertPanel extends StatelessWidget {
       },
       {'type': 'fight', 'icon': 'assets/markers/fight.gif', 'label': 'Fight'},
       {'type': 'knife', 'icon': 'assets/markers/knife.gif', 'label': 'Knife'},
-      {'type': 'gun', 'icon': 'assets/markers/gun.gif', 'label': 'gun'},
+      {'type': 'gun', 'icon': 'assets/markers/gun.gif', 'label': 'Gun'},
       {
         'type': 'medical',
         'icon': 'assets/markers/medicine.gif',
@@ -45,103 +35,110 @@ class AlertPanel extends StatelessWidget {
     ];
 
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         Align(
           alignment: Alignment.bottomCenter,
           child: Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            width: 176,
+            margin: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            padding: const EdgeInsets.all(12),
+            width: 220,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Text(
-                      "Send Alerts",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 10),
-                Container(
-                  height: 2,
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+                const Text(
+                  "Send Alerts",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      "Tap to instantly alert the community",
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 8,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 12),
+                Container(
+                  height: 1,
+                  width: double.infinity,
+                  color: Colors.grey.shade200,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                Text(
+                  "Tap to instantly alert to the community",
+                  style: TextStyle(
+                    color: Colors.grey.shade800,
+                    fontSize: 11,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Only raise genuine alerts. False or misleading reports may lead to account suspension.",
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 10,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
                 GridView.builder(
                   shrinkWrap: true,
                   itemCount: alertTypes.length,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
-                    childAspectRatio: 1,
+                    childAspectRatio: 1.0,
                     crossAxisSpacing: 6,
-                    mainAxisSpacing: 6,
+                    mainAxisSpacing: 8,
                   ),
                   itemBuilder: (context, i) {
                     final item = alertTypes[i];
-                    return GestureDetector(
-                      onTap: () {
-                        onAlertSelected?.call(item['type']!);
-                        onClose();
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Image.asset(
-                              item['icon']!,
-                              width: 24,
-                              height: 24,
-                              fit: BoxFit.contain,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              item['label']!,
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: Colors.grey.shade700,
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          onAlertSelected?.call(item['type']!);
+                          onClose();
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                item['icon']!,
+                                width: 28,
+                                height: 28,
+                                fit: BoxFit.contain,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                              const SizedBox(height: 6),
+                              Text(
+                                item['label']!,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade800,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -155,13 +152,22 @@ class AlertPanel extends StatelessWidget {
         // Pointer arrow
         Positioned(
           left: 40,
-          bottom: 6,
+          bottom: 14,
           child: Transform.rotate(
             angle: math.pi / 4, // 45 degrees
             child: Container(
               width: 20,
               height: 20,
-              decoration: BoxDecoration(color: Colors.white),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(2, 2),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -396,6 +396,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen>
               }
             },
             onTap: (pos) async {
+              // Close keyboard and dropdowns
+              FocusScope.of(context).unfocus();
+              mapController.closeAllPanels();
+
               // Handle alert location selection
               if (_isSelectingAlertLocation && _pendingAlertType != null) {
                 await mapController.setPreviewAlertMarker(
@@ -437,8 +441,27 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen>
               }
 
               if (state.showGetDirectionCard) {
-                await mapController.addRoute(null, pos);
-                return;
+                // This block might be redundant if we close panels above,
+                // but if we want to allow setting destination while card is open
+                // (which we just closed), we might need to rethink.
+                // However, user asked to close everything on map tap.
+                // So if they tap, it closes. If they want to select on map,
+                // they should probably use a specific "select on map" button
+                // which sets a mode, or we assume tap always closes unless in a mode.
+                // The previous logic was:
+                // if (state.showGetDirectionCard) { await mapController.addRoute(null, pos); return; }
+                // This implies tapping map while card is open sets destination.
+                // The user request: "when user click outside also destinationi prdeciton dropdown should cloase and all window should close"
+                // So I will prioritize closing.
+
+                // If we want to support "tap to set destination" it should probably be an explicit mode
+                // or we only close if NOT clicking on a marker/etc.
+                // But standard behavior for "click outside" is close.
+
+                // I will remove the auto-route-on-tap when card is open
+                // because we are closing the card now.
+                // If the user wants to select location, they can use the "map" icon in input field
+                // (which sets isDestinationSelectionMode).
               }
 
               // Close info window when tapping on map
@@ -690,50 +713,54 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen>
           Positioned(
             bottom: 56,
             left: 0,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 300),
-              opacity: state.showAlertPanel ? 1 : 0,
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOutBack,
-                scale: state.showAlertPanel ? 1 : 0.6,
-                child: AlertPanel(
-                  onClose: mapController.toggleAlertPanel,
-                  onAlertSelected: (alertType) async {
-                    // Direct alert placement flow
-                    if (state.myLocation != null) {
-                      // 1. Add marker to map
-                      await mapController.addAlertMarker(
-                        alertType,
-                        state.myLocation!,
-                      );
+            child: IgnorePointer(
+              ignoring: !state.showAlertPanel,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: state.showAlertPanel ? 1 : 0,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutBack,
+                  scale: state.showAlertPanel ? 1 : 0.6,
+                  alignment: Alignment.bottomLeft,
+                  child: AlertPanel(
+                    onClose: mapController.toggleAlertPanel,
+                    onAlertSelected: (alertType) async {
+                      // Direct alert placement flow
+                      if (state.myLocation != null) {
+                        // 1. Add marker to map
+                        await mapController.addAlertMarker(
+                          alertType,
+                          state.myLocation!,
+                        );
 
-                      // 2. Trigger burst animation
-                      _addBurst(state.myLocation!, alertType);
+                        // 2. Trigger burst animation
+                        _addBurst(state.myLocation!, alertType);
 
-                      // 3. Emit socket event (if not already handled by addAlertMarker,
-                      // but addAlertMarker in controller now calls _createAndAddAlertMarker
-                      // which adds to state. We need to ensure it emits too or we call emit separately.
-                      // Looking at controller, addAlertMarker just calls _createAndAddAlertMarker.
-                      // _createAndAddAlertMarker adds to state but DOES NOT emit.
-                      // finalizeAlertMarker DOES emit.
-                      // So we should probably call emit here or update controller.
-                      // Let's call emit directly via socketService for now to be safe and quick,
-                      // or better, let's update addAlertMarker in controller to also emit?
-                      // The user said "take rferent to this code handle socket service" previously.
-                      // In the previous turn I updated MapController but I didn't change addAlertMarker to emit.
-                      // I only updated finalizeAlertMarker to emit.
-                      // So I should probably manually emit here or create a new method in controller.
-                      // Actually, let's just use the socketService from controller.
+                        // 3. Emit socket event (if not already handled by addAlertMarker,
+                        // but addAlertMarker in controller now calls _createAndAddAlertMarker
+                        // which adds to state. We need to ensure it emits too or we call emit separately.
+                        // Looking at controller, addAlertMarker just calls _createAndAddAlertMarker.
+                        // _createAndAddAlertMarker adds to state but DOES NOT emit.
+                        // finalizeAlertMarker DOES emit.
+                        // So we should probably call emit here or update controller.
+                        // Let's call emit directly via socketService for now to be safe and quick,
+                        // or better, let's update addAlertMarker in controller to also emit?
+                        // The user said "take rferent to this code handle socket service" previously.
+                        // In the previous turn I updated MapController but I didn't change addAlertMarker to emit.
+                        // I only updated finalizeAlertMarker to emit.
+                        // So I should probably manually emit here or create a new method in controller.
+                        // Actually, let's just use the socketService from controller.
 
-                      mapController.socketService.emitAlert(
-                        alertType: alertType,
-                        position: state.myLocation!,
-                        userId:
-                            "67ed646cd9889612efdd464c", // Using the hardcoded ID from controller
-                      );
-                    }
-                  },
+                        mapController.socketService.emitAlert(
+                          alertType: alertType,
+                          position: state.myLocation!,
+                          userId:
+                              "67ed646cd9889612efdd464c", // Using the hardcoded ID from controller
+                        );
+                      }
+                    },
+                  ),
                 ),
               ),
             ),
@@ -742,14 +769,18 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen>
           Positioned(
             top: 65,
             right: 10,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 300),
-              opacity: state.showGetDirectionCard ? 1 : 0,
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 450),
-                curve: Curves.easeOutBack,
-                scale: state.showGetDirectionCard ? 1 : 0.6,
-                child: const GetDirectionCard(),
+            child: IgnorePointer(
+              ignoring: !state.showGetDirectionCard,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: state.showGetDirectionCard ? 1 : 0,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 450),
+                  curve: Curves.easeOutBack,
+                  scale: state.showGetDirectionCard ? 1 : 0.6,
+                  alignment: Alignment.topRight,
+                  child: const GetDirectionCard(),
+                ),
               ),
             ),
           ),

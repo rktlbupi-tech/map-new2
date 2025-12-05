@@ -142,11 +142,21 @@ class MapController extends StateNotifier<MapState> {
   }
 
   void toggleAlertPanel() {
-    state = state.copyWith(showAlertPanel: !state.showAlertPanel);
+    state = state.copyWith(
+      showAlertPanel: !state.showAlertPanel,
+      showGetDirectionCard: false,
+    );
   }
 
   void toggleGetDirectionCard() {
-    state = state.copyWith(showGetDirectionCard: !state.showGetDirectionCard);
+    state = state.copyWith(
+      showGetDirectionCard: !state.showGetDirectionCard,
+      showAlertPanel: false,
+    );
+  }
+
+  void closeAllPanels() {
+    state = state.copyWith(showAlertPanel: false, showGetDirectionCard: false);
   }
 
   void addMarker(Marker marker) {

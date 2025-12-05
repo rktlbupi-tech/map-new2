@@ -6,7 +6,6 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 class SocketService {
   late IO.Socket socket;
-  // TODO: Replace with actual socket URL
   final String _socketUrl = 'https://dev-api.presshop.news:3005';
 
   // Callbacks for events
@@ -35,7 +34,7 @@ class SocketService {
 
     socket.onConnect((_) {
       debugPrint('Connected to socket: ${socket.id}');
-      
+
       if (joinAs == "website") socket.emit("joinWebsite");
       if (joinAs == "admin") socket.emit("joinAdmin", userId);
       if (joinAs == "hopper") socket.emit("joinHopper", userId);
@@ -45,7 +44,6 @@ class SocketService {
     socket.onDisconnect((_) => debugPrint('Disconnected from socket'));
     socket.onError((data) => debugPrint("Error Socket ::: $data"));
 
-    // Listen for incident events
     socket.on("incident:new", (data) {
       debugPrint("Socket: incident:new received");
       onIncidentNew?.call(data);

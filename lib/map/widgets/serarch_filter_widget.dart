@@ -61,7 +61,7 @@ class SearchAndFilterBar extends StatelessWidget {
                             hintText: "Search this area",
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(
-                              vertical: 8,
+                              vertical: 10,
                               horizontal: 12,
                             ),
                             isDense: true,
@@ -69,8 +69,8 @@ class SearchAndFilterBar extends StatelessWidget {
                         ),
                       ),
                       Container(
-                        width: 35,
-                        height: 35,
+                        width: 38,
+                        height: 38,
                         decoration: BoxDecoration(
                           color: const Color(0xFFEC4E54),
                           borderRadius: BorderRadius.circular(6),
@@ -87,8 +87,8 @@ class SearchAndFilterBar extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Container(
-                width: 40,
-                height: 40,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   color: Colors.black,
                   borderRadius: BorderRadius.circular(10),
@@ -136,7 +136,15 @@ class SearchAndFilterBar extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: _FilterDropdown(
-                        items: const ['Category', 'Latest', 'Crime', 'Event','Political','Celebrity','Sports'],
+                        items: const [
+                          'Category',
+                          'Latest',
+                          'Crime',
+                          'Event',
+                          'Political',
+                          'Celebrity',
+                          'Sports',
+                        ],
                         selected: selectedCategory ?? 'Category',
                         onChanged: onCategoryChanged,
                       ),

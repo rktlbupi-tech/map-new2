@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:map/map/screens/marketplace_screen.dart';
+import 'package:map/map/widgets/action_primary_button.dart';
+import 'package:map/map/widgets/location_input_field.dart';
 
 class GetDirectionCard extends ConsumerStatefulWidget {
   const GetDirectionCard({super.key});
@@ -29,23 +31,36 @@ class _GetDirectionCardState extends ConsumerState<GetDirectionCard> {
   LatLng?
   _lastProcessedMapLocation; // Track last processed location to avoid reprocessing
 
+  final LayerLink _currentLocationLink = LayerLink();
+  final LayerLink _destinationLink = LayerLink();
+
   @override
   void initState() {
     super.initState();
-    _currentLocationController.text = 'Current Location';
+    // _currentLocationController.text = 'Choose starting point or click on map';
 
     _currentLocationFocusNode.addListener(() {
       if (!_currentLocationFocusNode.hasFocus) {
-        setState(() {
-          _showCurrentLocationDropdown = false;
+        // Delay hiding to allow tap on dropdown item
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) {
+            setState(() {
+              _showCurrentLocationDropdown = false;
+            });
+          }
         });
       }
     });
 
     _destinationFocusNode.addListener(() {
       if (!_destinationFocusNode.hasFocus) {
-        setState(() {
-          _showDestinationDropdown = false;
+        // Delay hiding to allow tap on dropdown item
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) {
+            setState(() {
+              _showDestinationDropdown = false;
+            });
+          }
         });
       }
     });
@@ -258,8 +273,8 @@ class _GetDirectionCardState extends ConsumerState<GetDirectionCard> {
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: 233,
-            padding: const EdgeInsets.all(12),
+            width: 280,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -272,325 +287,295 @@ class _GetDirectionCardState extends ConsumerState<GetDirectionCard> {
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                /// ------- TITLE -------
-                Text(
-                  'Get Direction',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.black.withOpacity(0.9),
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-                const Divider(height: 1, color: Colors.black12),
-                const SizedBox(height: 10),
-
-                /// ------- LOCATION INPUTS -------
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      children: [
-                        const Icon(
-                          Icons.my_location,
-                          size: 11,
-                          color: Colors.redAccent,
-                        ),
-                        const SizedBox(height: 10),
-                        dottedLine(),
-                        const SizedBox(height: 10),
-                        const Icon(Icons.location_on_outlined, size: 11),
-                      ],
+                    /// ------- TITLE -------
+                    Text(
+                      'Get Direction',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black.withOpacity(0.9),
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Stack(
+
+                    const SizedBox(height: 6),
+                    const Divider(height: 1, color: Colors.black12),
+                    const SizedBox(height: 8),
+
+                    /// ------- LOCATION INPUTS -------
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(width: 4),
+
+                        Column(
+                          children: [
+                            const SizedBox(width: 12),
+                            const Icon(
+                              Icons.my_location,
+                              size: 18,
+                              color: Colors.redAccent,
+                            ),
+                            const SizedBox(height: 12),
+                            dottedLine(),
+                            const SizedBox(height: 12),
+                            const Icon(Icons.location_on_outlined, size: 18),
+                          ],
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
                             children: [
-                              TextField(
-                                controller: _currentLocationController,
-                                focusNode: _currentLocationFocusNode,
-                                onChanged: (value) =>
-                                    _searchPlaces(value, isOrigin: true),
-                                decoration: InputDecoration(
-                                  hintText: 'Your Location',
-                                  filled: true,
-                                  hintStyle: const TextStyle(fontSize: 12),
-                                  fillColor: Colors.grey.shade100,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                  isDense: true,
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                      color: Colors.grey,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                      color: Colors.black,
-                                      width: 1.2,
-                                    ),
-                                  ),
+                              CompositedTransformTarget(
+                                link: _currentLocationLink,
+                                child: LocationInputField(
+                                  controller: _currentLocationController,
+                                  focusNode: _currentLocationFocusNode,
+                                  hintText: 'Choose starting point',
+                                  onChanged: (value) =>
+                                      _searchPlaces(value, isOrigin: true),
                                   suffixIcon: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.my_location,
-                                          size: 18,
-                                        ),
-                                        onPressed: _useCurrentLocation,
-                                        tooltip: 'Use Current Location',
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.map, size: 18),
-                                        onPressed: () {
-                                          ref
-                                              .read(
-                                                mapControllerProvider.notifier,
-                                              )
-                                              .setDestinationSelectionMode(
-                                                true,
-                                                isOrigin: true,
-                                              );
-                                          _currentLocationFocusNode.unfocus();
-                                        },
-                                        tooltip: 'Select on Map',
-                                      ),
+                                      // IconButton(
+                                      //   icon: const Icon(
+                                      //     Icons.my_location,
+                                      //     size: 16,
+                                      //   ),
+                                      //   onPressed: _useCurrentLocation,
+                                      //   tooltip: 'Use Current Location',
+                                      // ),
+                                      // IconButton(
+                                      //   icon: const Icon(Icons.map, size: 16),
+                                      //   onPressed: () {
+                                      //     ref
+                                      //         .read(
+                                      //           mapControllerProvider.notifier,
+                                      //         )
+                                      //         .setDestinationSelectionMode(
+                                      //           true,
+                                      //           isOrigin: true,
+                                      //         );
+                                      //     _currentLocationFocusNode.unfocus();
+                                      //   },
+                                      //   tooltip: 'Select on Map',
+                                      // ),
                                     ],
                                   ),
                                 ),
                               ),
-                              if (_showCurrentLocationDropdown &&
-                                  _currentLocationPredictions.isNotEmpty)
-                                Positioned(
-                                  top: 40,
-                                  left: 0,
-                                  right: 0,
-                                  child: Material(
-                                    elevation: 4,
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        maxHeight: 150,
-                                      ),
-                                      child: ListView.builder(
-                                        shrinkWrap: true,
-                                        padding: EdgeInsets.zero,
-                                        itemCount:
-                                            _currentLocationPredictions.length,
-                                        itemBuilder: (context, index) {
-                                          final prediction =
-                                              _currentLocationPredictions[index];
-                                          return InkWell(
-                                            onTap: () {
-                                              _selectPlace(
-                                                prediction['place_id'],
-                                                prediction['description'],
-                                                isOrigin: true,
-                                              );
-                                            },
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 8,
-                                                  ),
-                                              child: Text(
-                                                prediction['description'],
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Stack(
-                            children: [
-                              TextField(
-                                controller: _destinationController,
-                                focusNode: _destinationFocusNode,
-                                onChanged: (value) =>
-                                    _searchPlaces(value, isOrigin: false),
-                                decoration: InputDecoration(
-                                  hintText: 'Destination',
-                                  hintStyle: const TextStyle(fontSize: 12),
-                                  filled: true,
-                                  fillColor: Colors.grey.shade100,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                    horizontal: 12,
-                                  ),
-                                  isDense: true,
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                      color: Colors.grey,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                      color: Colors.black,
-                                      width: 1.2,
-                                    ),
-                                  ),
-                                  suffixIcon: IconButton(
-                                    icon: const Icon(Icons.map, size: 18),
-                                    onPressed: () {
-                                      // Enable map selection mode
-                                      ref
-                                          .read(mapControllerProvider.notifier)
-                                          .setDestinationSelectionMode(true);
-                                      _destinationFocusNode.unfocus();
-                                    },
-                                    tooltip: 'Select on Map',
-                                  ),
+                              const SizedBox(height: 8),
+                              CompositedTransformTarget(
+                                link: _destinationLink,
+                                child: LocationInputField(
+                                  controller: _destinationController,
+                                  focusNode: _destinationFocusNode,
+                                  hintText: 'Choose destination',
+                                  onChanged: (value) =>
+                                      _searchPlaces(value, isOrigin: false),
+                                  // suffixIcon: IconButton(
+                                  //   icon: const Icon(Icons.map, size: 16),
+                                  //   onPressed: () {
+                                  //     // Enable map selection mode
+                                  //     ref
+                                  //         .read(mapControllerProvider.notifier)
+                                  //         .setDestinationSelectionMode(true);
+                                  //     _destinationFocusNode.unfocus();
+                                  //   },
+                                  //   tooltip: 'Select on Map',
+                                  // ),
                                 ),
                               ),
-                              if (_showDestinationDropdown &&
-                                  _destinationPredictions.isNotEmpty)
-                                Positioned(
-                                  top: 40,
-                                  left: 0,
-                                  right: 0,
-                                  child: Material(
-                                    elevation: 4,
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        maxHeight: 150,
-                                      ),
-                                      child: ListView.builder(
-                                        shrinkWrap: true,
-                                        padding: EdgeInsets.zero,
-                                        itemCount:
-                                            _destinationPredictions.length,
-                                        itemBuilder: (context, index) {
-                                          final prediction =
-                                              _destinationPredictions[index];
-                                          return InkWell(
-                                            onTap: () {
-                                              _selectPlace(
-                                                prediction['place_id'],
-                                                prediction['description'],
-                                                isOrigin: false,
-                                              );
-                                            },
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 8,
-                                                  ),
-                                              child: Text(
-                                                prediction['description'],
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
                             ],
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 38,
+                      child: ActionPrimaryButton(
+                        text: 'GO',
+                        isLoading: _isLoading,
+                        onPressed: () async {
+                          if (_destinationController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter a destination'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          final origin = _selectedOrigin;
+                          final destination =
+                              _selectedDestination ?? state.destination;
+
+                          if (destination != null) {
+                            await _getRoute(origin, destination);
+                            ref
+                                .read(mapControllerProvider.notifier)
+                                .startNavigation();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Please select a destination from the suggestions or map',
+                                ),
+                              ),
+                            );
+                          }
+                        },
                       ),
                     ),
+                    // const SizedBox(height: 10),
                   ],
                 ),
 
-                const SizedBox(height: 14),
-
-                /// ------- GO BUTTON -------
-                SizedBox(
-                  width: double.infinity,
-                  height: 32,
-                  child: ElevatedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () async {
-                            if (_destinationController.text.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Please enter a destination'),
-                                ),
-                              );
-                              return;
-                            }
-                            // Use selected origin or current location (null = current location)
-                            final origin = _selectedOrigin;
-
-                            // Use selected destination or state destination
-                            final destination =
-                                _selectedDestination ?? state.destination;
-                            if (destination != null) {
-                              await _getRoute(origin, destination);
-                              // Start navigation
-                              ref
-                                  .read(mapControllerProvider.notifier)
-                                  .startNavigation();
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Please select a destination from the suggestions or map',
+                // Dropdowns
+                if (_showCurrentLocationDropdown &&
+                    _currentLocationPredictions.isNotEmpty)
+                  Positioned(
+                    width:
+                        226, // Card width (280) - padding (20) - icon width (34) approx
+                    child: CompositedTransformFollower(
+                      link: _currentLocationLink,
+                      showWhenUnlinked: false,
+                      offset: const Offset(0, 40),
+                      child: Material(
+                        elevation: 8,
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        shadowColor: Colors.black26,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            itemCount: _currentLocationPredictions.length,
+                            separatorBuilder: (context, index) =>
+                                const Divider(height: 1, color: Colors.black12),
+                            itemBuilder: (context, index) {
+                              final prediction =
+                                  _currentLocationPredictions[index];
+                              return InkWell(
+                                onTap: () {
+                                  _selectPlace(
+                                    prediction['place_id'],
+                                    prediction['description'],
+                                    isOrigin: true,
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.location_on,
+                                        size: 14,
+                                        color: Colors.black45,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          prediction['description'],
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.black87,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                            },
+                          ),
+                        ),
                       ),
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : const Text(
-                            'GO',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 10,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
                   ),
-                ),
+
+                if (_showDestinationDropdown &&
+                    _destinationPredictions.isNotEmpty)
+                  Positioned(
+                    width: 226,
+                    child: CompositedTransformFollower(
+                      link: _destinationLink,
+                      showWhenUnlinked: false,
+                      offset: const Offset(0, 40),
+                      child: Material(
+                        elevation: 8,
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                        shadowColor: Colors.black26,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            itemCount: _destinationPredictions.length,
+                            separatorBuilder: (context, index) =>
+                                const Divider(height: 1, color: Colors.black12),
+                            itemBuilder: (context, index) {
+                              final prediction = _destinationPredictions[index];
+                              return InkWell(
+                                onTap: () {
+                                  _selectPlace(
+                                    prediction['place_id'],
+                                    prediction['description'],
+                                    isOrigin: false,
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.location_on,
+                                        size: 14,
+                                        color: Colors.black45,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          prediction['description'],
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.black87,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -612,7 +597,7 @@ class _GetDirectionCardState extends ConsumerState<GetDirectionCard> {
 
 Widget dottedLine() {
   return SizedBox(
-    height: 20,
+    height: 12,
     child: LayoutBuilder(
       builder: (context, constraints) {
         final boxHeight = constraints.maxHeight;
